@@ -14,7 +14,6 @@ HIGHLIGHT_PADDING_H = 2
 HIGHLIGHT_PADDING_V = -2
 
 
-
 # Colours
 BG = color.rgb(20, 25, 40)
 HL = color.rgb(60, 80, 120)
@@ -23,17 +22,19 @@ ACTIVE = color.rgb(233, 123, 22)
 HOLD = color.rgb(233, 233, 100)
 INACTIVE = color.rgb(180, 180, 180)
 
+# global things
+active = 0
+pos = vec2(0, 0)
+
 # STATES for (LT, G1, G2, CT, G1I, G2I)
 counters = [1, 5, 10, 4, 0, 0]
 defaults = [1, 5, 10, 4, 0, 0]
 max_vals = [2, 10, 10, 5, 10, 10]
-
 prev_counters = counters[:]
 
 BTN_A, BTN_B, BTN_C, BTN_UP, BTN_DOWN = 0, 1, 2, 3, 4
 BTN_LIST = (BTN_A, BTN_B, BTN_C, BTN_UP, BTN_DOWN)
 
-active = 0
 
 SCREEN_W = screen.width
 SCREEN_H = screen.height
@@ -60,38 +61,43 @@ ICONS = (
 SECTIONS = (0, 1, 2, 0, 1, 2)
 
 OFFSET_DEP = (
-    (0, 0),  # dummy
-    (4, -1), # 1 depends on 4 → negative
+    (-1, 0),  # dummy
+    (4, -1),  # 1 depends on 4 → negative
     (5, -1),
     (0, 0),
     (1, 1),  # 4 depends on 1 → positive
     (2, 1),
 )
 
-STRINGS = ("0","1","2","3","4","5","6","7","8","9","10")
+STRINGS = ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
 
 STATE_IDLE = 0
 STATE_A = 1
 STATE_B = 2
 STATE_C = 3
 
-STATE_TO_INDEX = (0, 3, 4, 5)
+STATE_TO_INDEX = (-1, 3, 4, 5)
 
 state = STATE_IDLE
+prev_state = STATE_IDLE
 
 blit = screen.blit
 text = screen.text
 rect = screen.shape
 
+
 def handle_input():
     global state, active
 
-    s = 0
+    s = STATE_IDLE
     p = -1
 
-    if badge.held(BTN_A): s = 1
-    elif badge.held(BTN_B): s = 2
-    elif badge.held(BTN_C): s = 3
+    if badge.held(BTN_A):
+        s = STATE_A
+    elif badge.held(BTN_B):
+        s = STATE_B
+    elif badge.held(BTN_C):
+        s = STATE_C
 
     for i in range(5):
         if badge.pressed(BTN_LIST[i]):
@@ -100,21 +106,23 @@ def handle_input():
 
     state = s
 
-    # Combo actions
-    if s == 3:
-        if p == 0:
-            for i in range(6): counters[i] = defaults[i]
+    if s == STATE_C:
+        if p == BTN_A:
+            for i in range(6):
+                counters[i] = defaults[i]
             return s
-        elif p == 1:
-            for i in range(6): counters[i] = 0
+        elif p == BTN_B:
+            for i in range(6):
+                counters[i] = 0
             return s
 
     if s:
         active = STATE_TO_INDEX[s]
 
-    if p == 3 or p == 4:
+    if p == BTN_UP or p == BTN_DOWN:
         tgt = STATE_TO_INDEX[s] if s else active
-        v = counters[tgt] + (1 if p == 3 else -1)
+        v = counters[tgt] + (1 if p == BTN_UP else -1)
+
         if 0 <= v <= max_vals[tgt]:
             counters[tgt] = v
 
@@ -133,7 +141,6 @@ def draw_icons():
 
         icon, w, h = ICONS[i]
 
-
         cx = CENTER_X[SECTIONS[i]]
         x = cx - (w >> 1)
 
@@ -144,13 +151,18 @@ def draw_icons():
         if i == 3:
             px = 0
             for j in range(c):
-                blit(icon, (px, 0))
+                pos.x = px
+                pos.y = 0
+                blit(icon, pos)
                 px += ICON_SPACING
             continue
 
         y = bottom_y - h
         for j in range(c):
-            blit(icon, (x, y - j * ICON_SPACING))
+            pos.x = x
+            pos.y = y - j * ICON_SPACING
+            blit(icon, pos)
+
 
 def draw_text(s):
     cnts = counters
@@ -173,7 +185,7 @@ def draw_text(s):
         w = len(val) * CHAR_W
         x = CENTER_X[i] - (w >> 1)
 
-        held = (s and idx == STATE_TO_INDEX[s])
+        held = s and idx == STATE_TO_INDEX[s]
 
         if held:
             col = HOLD
@@ -187,12 +199,14 @@ def draw_text(s):
 
         if hl:
             screen.pen = HL
-            rect(shape.rectangle(
-                x - HIGHLIGHT_PADDING_H,
-                BOTTOM_Y - HIGHLIGHT_PADDING_V,
-                w + (HIGHLIGHT_PADDING_H << 1),
-                text_h + (HIGHLIGHT_PADDING_V << 1)
-            ))
+            rect(
+                shape.rectangle(
+                    x - HIGHLIGHT_PADDING_H,
+                    BOTTOM_Y - HIGHLIGHT_PADDING_V,
+                    w + (HIGHLIGHT_PADDING_H << 1),
+                    text_h + (HIGHLIGHT_PADDING_V << 1),
+                )
+            )
 
         screen.pen = SHADOW
         text(val, x + 1, BOTTOM_Y + 1)
@@ -202,19 +216,26 @@ def draw_text(s):
 
 dirty = True
 
+
 def update():
-    global dirty
+    global dirty, prev_active, prev_state
 
     s = handle_input()
-
     if not dirty:
-        for i in range(6):
-            if counters[i] != prev_counters[i]:
-                dirty = True
-                break
+        if s != prev_state or active != prev_active:
+            dirty = True
+        else:
+            for i in range(6):
+                if counters[i] != prev_counters[i]:
+                    dirty = True
+                    break
 
     if not dirty:
         return
+
+    # Save state
+    prev_state = s
+    prev_active = active
 
     for i in range(6):
         prev_counters[i] = counters[i]
@@ -226,5 +247,6 @@ def update():
 
     draw_icons()
     draw_text(s)
+
 
 run(update)
