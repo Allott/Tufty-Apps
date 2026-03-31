@@ -43,10 +43,12 @@ SECTION_W = SCREEN_W // 3
 CHAR_W, text_h = screen.measure_text("0")
 BOTTOM_Y = SCREEN_H - text_h - HIGHLIGHT_PADDING_V
 
+# Apparently got in the middle of x86 vs arm details implementations
+# TODO: read which cpu is used in rp2350.
 CENTER_X = (
-    SECTION_W >> 1,
-    SECTION_W + (SECTION_W >> 1),
-    (SECTION_W << 1) + (SECTION_W >> 1),
+    SECTION_W // 2,  #  SECTION_W >> 1,
+    SECTION_W + (SECTION_W // 2),  #  SECTION_W + (SECTION_W >> 1),
+    (SECTION_W * 2) + (SECTION_W // 2),  # SECTION_W << 1) + (SECTION_W >> 1),
 )
 
 ICONS = (
@@ -203,8 +205,8 @@ def draw_text(s):
                 shape.rectangle(
                     x - HIGHLIGHT_PADDING_H,
                     BOTTOM_Y - HIGHLIGHT_PADDING_V,
-                    w + (HIGHLIGHT_PADDING_H << 1),
-                    text_h + (HIGHLIGHT_PADDING_V << 1),
+                    w + (HIGHLIGHT_PADDING_H * 2),
+                    text_h + (HIGHLIGHT_PADDING_V * 2),
                 )
             )
 
